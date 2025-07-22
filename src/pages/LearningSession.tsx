@@ -104,7 +104,20 @@ export default function LearningSession() {
   }, [])
 
   const checkAnswer = (answer: string) => {
-    const correct = answer === currentQ.answer.toString().toLowerCase()
+    const userInput = answer.toLowerCase().trim()
+    const expectedAnswer = currentQ.answer.toString().toLowerCase()
+    
+    // Handle number words (five, six, seven, etc.)
+    const numberWords: { [key: string]: string } = {
+      'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+      'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9',
+      'ten': '10', 'eleven': '11', 'twelve': '12'
+    }
+    
+    // Convert number words to digits
+    const normalizedInput = numberWords[userInput] || userInput
+    
+    const correct = normalizedInput === expectedAnswer
     setIsCorrect(correct)
     setShowFeedback(true)
 
@@ -114,7 +127,7 @@ export default function LearningSession() {
       speakText("Excellent! That's correct! You're doing great!")
     } else {
       setHearts(Math.max(0, hearts - 1))
-      speakText("Not quite right, but that's okay! Let me help you.")
+      speakText(`Not quite right, but that's okay! The answer is ${currentQ.answer}. Let's try the next one!`)
     }
 
     setTimeout(() => {
@@ -132,27 +145,43 @@ export default function LearningSession() {
       recognition.continuous = false
       recognition.interimResults = false
       recognition.lang = 'en-US'
+      recognition.maxAlternatives = 3
 
       recognition.onstart = () => {
         setIsListening(true)
+        console.log('Speech recognition started')
       }
 
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript.toLowerCase().trim()
+        console.log('Speech recognition result:', transcript)
         setUserAnswer(transcript)
         checkAnswer(transcript)
       }
 
-      recognition.onerror = () => {
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error)
         setIsListening(false)
         speakText("I didn't catch that. Let's try again!")
       }
 
       recognition.onend = () => {
+        console.log('Speech recognition ended')
         setIsListening(false)
       }
 
-      recognition.start()
+      try {
+        recognition.start()
+      } catch (error) {
+        console.error('Failed to start speech recognition:', error)
+        setIsListening(false)
+        // Fallback to text input
+        const answer = prompt('Please type your answer:')
+        if (answer) {
+          setUserAnswer(answer)
+          checkAnswer(answer.toLowerCase().trim())
+        }
+      }
     } else {
       // Fallback for browsers without speech recognition
       const answer = prompt('Please type your answer:')
@@ -317,6 +346,7 @@ export default function LearningSession() {
                 {userAnswer && (
                   <div className="mb-4">
                     <p className="text-lg text-gray-600">You said: "{userAnswer}"</p>
+                    <p className="text-sm text-gray-500">Expected: "{currentQ.answer}"</p>
                   </div>
                 )}
 
